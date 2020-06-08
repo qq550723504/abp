@@ -20,6 +20,7 @@
     <abp-script src="/Pages/Docs/Admin/Projects/index.js" />
     <abp-script src="/Pages/Docs/Admin/Projects/create.js" />
     <abp-script src="/Pages/Docs/Admin/Projects/edit.js" />
+    <abp-script src="/Pages/Docs/Admin/Projects/pull.js" />
 }
 
 <abp-card>
@@ -37,6 +38,10 @@
                             <abp-dropdown-item href="#" id="CreateNewGithubProjectButtonId"><i class="fa fa-github"></i> GitHub</abp-dropdown-item>
                         </abp-dropdown-menu>
                     </abp-dropdown>
+                }
+                @if (await Authorization.IsGrantedAsync(DocsAdminPermissions.Projects.Default))
+                {
+                    <abp-button button-type="Primary" icon="plus" text="@L["ReIndexAllProjects"].Value" id="ReIndexAllProjects" />
                 }
             </abp-column>
         </abp-row>

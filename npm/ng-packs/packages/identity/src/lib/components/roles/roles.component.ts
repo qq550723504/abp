@@ -1,13 +1,20 @@
 import { ABP } from '@abp/ng.core';
-import { ConfirmationService, Toaster } from '@abp/ng.theme.shared';
-import { Component, TemplateRef, ViewChild, OnInit, ContentChild, ElementRef } from '@angular/core';
-import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
+import { ConfirmationService, Confirmation } from '@abp/ng.theme.shared';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
 import { Select, Store } from '@ngxs/store';
 import { Observable } from 'rxjs';
 import { finalize, pluck } from 'rxjs/operators';
-import { CreateRole, DeleteRole, GetRoleById, GetRoles, UpdateRole } from '../../actions/identity.actions';
+import {
+  CreateRole,
+  DeleteRole,
+  GetRoleById,
+  GetRoles,
+  UpdateRole,
+} from '../../actions/identity.actions';
 import { Identity } from '../../models/identity';
 import { IdentityState } from '../../states/identity.state';
+import { ePermissionManagementComponents } from '@abp/ng.permission-management';
 
 @Component({
   selector: 'abp-roles',
@@ -30,7 +37,7 @@ export class RolesComponent implements OnInit {
 
   providerKey: string;
 
-  pageQuery: ABP.PageQueryParams = {};
+  pageQuery: ABP.PageQueryParams = { maxResultCount: 10 };
 
   loading = false;
 
@@ -40,16 +47,26 @@ export class RolesComponent implements OnInit {
 
   sortKey = '';
 
+  permissionManagementKey = ePermissionManagementComponents.PermissionManagement;
+
   @ViewChild('formRef', { static: false, read: ElementRef })
   formRef: ElementRef<HTMLFormElement>;
 
-  constructor(private confirmationService: ConfirmationService, private fb: FormBuilder, private store: Store) {}
+  onVisiblePermissionChange = event => {
+    this.visiblePermissions = event;
+  };
+
+  constructor(
+    private confirmationService: ConfirmationService,
+    private fb: FormBuilder,
+    private store: Store,
+  ) {}
 
   ngOnInit() {
     this.get();
   }
 
-  createForm() {
+  buildForm() {
     this.form = this.fb.group({
       name: new FormControl({ value: this.selected.name || '', disabled: this.selected.isStatic }, [
         Validators.required,
@@ -61,7 +78,7 @@ export class RolesComponent implements OnInit {
   }
 
   openModal() {
-    this.createForm();
+    this.buildForm();
     this.isModalVisible = true;
   }
 
@@ -93,6 +110,7 @@ export class RolesComponent implements OnInit {
       .pipe(finalize(() => (this.modalBusy = false)))
       .subscribe(() => {
         this.isModalVisible = false;
+        this.get();
       });
   }
 
@@ -101,16 +119,15 @@ export class RolesComponent implements OnInit {
       .warn('AbpIdentity::RoleDeletionConfirmationMessage', 'AbpIdentity::AreYouSure', {
         messageLocalizationParams: [name],
       })
-      .subscribe((status: Toaster.Status) => {
-        if (status === Toaster.Status.confirm) {
-          this.store.dispatch(new DeleteRole(id));
+      .subscribe((status: Confirmation.Status) => {
+        if (status === Confirmation.Status.confirm) {
+          this.store.dispatch(new DeleteRole(id)).subscribe(() => this.get());
         }
       });
   }
 
-  onPageChange(data) {
-    this.pageQuery.skipCount = data.first;
-    this.pageQuery.maxResultCount = data.rows;
+  onPageChange(page: number) {
+    this.pageQuery.skipCount = (page - 1) * this.pageQuery.maxResultCount;
 
     this.get();
   }
@@ -124,6 +141,15 @@ export class RolesComponent implements OnInit {
   }
 
   onClickSaveButton() {
-    this.formRef.nativeElement.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    this.formRef.nativeElement.dispatchEvent(
+      new Event('submit', { bubbles: true, cancelable: true }),
+    );
+  }
+
+  openPermissionsModal(providerKey: string) {
+    this.providerKey = providerKey;
+    setTimeout(() => {
+      this.visiblePermissions = true;
+    }, 0);
   }
 }

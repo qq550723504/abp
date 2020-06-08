@@ -1,7 +1,14 @@
-import { ABP, ConfigState } from '@abp/ng.core';
-import { ConfirmationService, Toaster } from '@abp/ng.theme.shared';
-import { Component, TemplateRef, TrackByFunction, ViewChild, OnInit } from '@angular/core';
-import { AbstractControl, FormArray, FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
+import { ABP } from '@abp/ng.core';
+import { Confirmation, ConfirmationService, getPasswordValidators } from '@abp/ng.theme.shared';
+import { Component, OnInit, TemplateRef, TrackByFunction, ViewChild } from '@angular/core';
+import {
+  AbstractControl,
+  FormArray,
+  FormBuilder,
+  FormControl,
+  FormGroup,
+  Validators,
+} from '@angular/forms';
 import { Select, Store } from '@ngxs/store';
 import { Observable } from 'rxjs';
 import { finalize, pluck, switchMap, take } from 'rxjs/operators';
@@ -13,11 +20,11 @@ import {
   GetUserRoles,
   GetUsers,
   UpdateUser,
-  GetRoles,
 } from '../../actions/identity.actions';
 import { Identity } from '../../models/identity';
+import { IdentityService } from '../../services/identity.service';
 import { IdentityState } from '../../states/identity.state';
-import { PasswordRules, validatePassword } from '@ngx-validate/core';
+import { ePermissionManagementComponents } from '@abp/ng.permission-management';
 @Component({
   selector: 'abp-users',
   templateUrl: './users.component.html',
@@ -44,7 +51,7 @@ export class UsersComponent implements OnInit {
 
   providerKey: string;
 
-  pageQuery: ABP.PageQueryParams = {};
+  pageQuery: ABP.PageQueryParams = { maxResultCount: 10 };
 
   isModalVisible: boolean;
 
@@ -56,76 +63,62 @@ export class UsersComponent implements OnInit {
 
   sortKey = '';
 
-  passwordRulesArr = [] as PasswordRules;
-
-  requiredPasswordLength = 1;
+  permissionManagementKey = ePermissionManagementComponents.PermissionManagement;
 
   trackByFn: TrackByFunction<AbstractControl> = (index, item) => Object.keys(item)[0] || index;
+
+  onVisiblePermissionChange = event => {
+    this.visiblePermissions = event;
+  };
 
   get roleGroups(): FormGroup[] {
     return snq(() => (this.form.get('roleNames') as FormArray).controls as FormGroup[], []);
   }
 
-  constructor(private confirmationService: ConfirmationService, private fb: FormBuilder, private store: Store) {}
+  constructor(
+    private confirmationService: ConfirmationService,
+    private fb: FormBuilder,
+    private store: Store,
+    private identityService: IdentityService,
+  ) {}
 
   ngOnInit() {
     this.get();
-
-    const passwordRules: ABP.Dictionary<string> = this.store.selectSnapshot(
-      ConfigState.getSettings('Identity.Password'),
-    );
-
-    if ((passwordRules['Abp.Identity.Password.RequireDigit'] || '').toLowerCase() === 'true') {
-      this.passwordRulesArr.push('number');
-    }
-
-    if ((passwordRules['Abp.Identity.Password.RequireLowercase'] || '').toLowerCase() === 'true') {
-      this.passwordRulesArr.push('small');
-    }
-
-    if ((passwordRules['Abp.Identity.Password.RequireUppercase'] || '').toLowerCase() === 'true') {
-      this.passwordRulesArr.push('capital');
-    }
-
-    if (+(passwordRules['Abp.Identity.Password.RequiredUniqueChars'] || 0) > 0) {
-      this.passwordRulesArr.push('special');
-    }
-
-    if (Number.isInteger(+passwordRules['Abp.Identity.Password.RequiredLength'])) {
-      this.requiredPasswordLength = +passwordRules['Abp.Identity.Password.RequiredLength'];
-    }
   }
 
-  onSearch(value) {
+  onSearch(value: string) {
     this.pageQuery.filter = value;
     this.get();
   }
 
   buildForm() {
-    this.store.dispatch(new GetRoles()).subscribe(() => {
-      this.roles = this.store.selectSnapshot(IdentityState.getRoles);
+    this.identityService.getAllRoles().subscribe(({ items }) => {
+      this.roles = items;
       this.form = this.fb.group({
         userName: [this.selected.userName || '', [Validators.required, Validators.maxLength(256)]],
-        email: [this.selected.email || '', [Validators.required, Validators.email, Validators.maxLength(256)]],
+        email: [
+          this.selected.email || '',
+          [Validators.required, Validators.email, Validators.maxLength(256)],
+        ],
         name: [this.selected.name || '', [Validators.maxLength(64)]],
         surname: [this.selected.surname || '', [Validators.maxLength(64)]],
         phoneNumber: [this.selected.phoneNumber || '', [Validators.maxLength(16)]],
-        lockoutEnabled: [this.selected.twoFactorEnabled || (this.selected.id ? false : true)],
+        lockoutEnabled: [this.selected.lockoutEnabled || (this.selected.id ? false : true)],
         twoFactorEnabled: [this.selected.twoFactorEnabled || (this.selected.id ? false : true)],
         roleNames: this.fb.array(
           this.roles.map(role =>
             this.fb.group({
-              [role.name]: [!!snq(() => this.selectedUserRoles.find(userRole => userRole.id === role.id))],
+              [role.name]: [
+                this.selected.id
+                  ? !!snq(() => this.selectedUserRoles.find(userRole => userRole.id === role.id))
+                  : role.isDefault,
+              ],
             }),
           ),
         ),
       });
 
-      const passwordValidators = [
-        validatePassword(this.passwordRulesArr),
-        Validators.minLength(this.requiredPasswordLength),
-        Validators.maxLength(32),
-      ];
+      const passwordValidators = getPasswordValidators(this.store);
 
       this.form.addControl('password', new FormControl('', [...passwordValidators]));
 
@@ -157,7 +150,7 @@ export class UsersComponent implements OnInit {
       )
       .subscribe((state: Identity.State) => {
         this.selected = state.selectedUser;
-        this.selectedUserRoles = state.selectedUserRoles;
+        this.selectedUserRoles = state.selectedUserRoles || [];
         this.openModal();
       });
   }
@@ -168,7 +161,8 @@ export class UsersComponent implements OnInit {
 
     const { roleNames } = this.form.value;
     const mappedRoleNames = snq(
-      () => roleNames.filter(role => !!role[Object.keys(role)[0]]).map(role => Object.keys(role)[0]),
+      () =>
+        roleNames.filter(role => !!role[Object.keys(role)[0]]).map(role => Object.keys(role)[0]),
       [],
     );
 
@@ -189,6 +183,7 @@ export class UsersComponent implements OnInit {
       .pipe(finalize(() => (this.modalBusy = false)))
       .subscribe(() => {
         this.isModalVisible = false;
+        this.get();
       });
   }
 
@@ -197,16 +192,15 @@ export class UsersComponent implements OnInit {
       .warn('AbpIdentity::UserDeletionConfirmationMessage', 'AbpIdentity::AreYouSure', {
         messageLocalizationParams: [userName],
       })
-      .subscribe((status: Toaster.Status) => {
-        if (status === Toaster.Status.confirm) {
-          this.store.dispatch(new DeleteUser(id));
+      .subscribe((status: Confirmation.Status) => {
+        if (status === Confirmation.Status.confirm) {
+          this.store.dispatch(new DeleteUser(id)).subscribe(() => this.get());
         }
       });
   }
 
-  onPageChange(data) {
-    this.pageQuery.skipCount = data.first;
-    this.pageQuery.maxResultCount = data.rows;
+  onPageChange(page: number) {
+    this.pageQuery.skipCount = (page - 1) * this.pageQuery.maxResultCount;
 
     this.get();
   }
@@ -217,5 +211,12 @@ export class UsersComponent implements OnInit {
       .dispatch(new GetUsers(this.pageQuery))
       .pipe(finalize(() => (this.loading = false)))
       .subscribe();
+  }
+
+  openPermissionsModal(providerKey: string) {
+    this.providerKey = providerKey;
+    setTimeout(() => {
+      this.visiblePermissions = true;
+    }, 0);
   }
 }

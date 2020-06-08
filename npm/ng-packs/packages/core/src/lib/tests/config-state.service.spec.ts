@@ -3,6 +3,7 @@ import { ConfigStateService } from '../services/config-state.service';
 import { ConfigState } from '../states';
 import { Store } from '@ngxs/store';
 import { Config } from '../models/config';
+import * as ConfigActions from '../actions';
 
 const CONFIG_STATE_DATA = {
   environment: {
@@ -82,6 +83,26 @@ const CONFIG_STATE_DATA = {
         flagIcon: null,
       },
     ],
+    currentCulture: {
+      displayName: 'English',
+      englishName: 'English',
+      threeLetterIsoLanguageName: 'eng',
+      twoLetterIsoLanguageName: 'en',
+      isRightToLeft: false,
+      cultureName: 'en',
+      name: 'en',
+      nativeName: 'English',
+      dateTimeFormat: {
+        calendarAlgorithmType: 'SolarCalendar',
+        dateTimeFormatLong: 'dddd, MMMM d, yyyy',
+        shortDatePattern: 'M/d/yyyy',
+        fullDateTimePattern: 'dddd, MMMM d, yyyy h:mm:ss tt',
+        dateSeparator: '/',
+        shortTimePattern: 'h:mm tt',
+        longTimePattern: 'h:mm:ss tt',
+      },
+    },
+    defaultResourceName: null,
   },
   auth: {
     policies: {
@@ -101,6 +122,7 @@ const CONFIG_STATE_DATA = {
     id: null,
     tenantId: null,
     userName: null,
+    email: null,
   },
   features: {
     values: {},
@@ -138,6 +160,23 @@ describe('ConfigStateService', () => {
           service[fnName]();
           expect(spy).toHaveBeenCalledWith(ConfigState[fnName]);
         }
+      });
+  });
+
+  test('should have a dispatch method for every ConfigState action', () => {
+    const reg = /(?<=dispatch)(\w+)(?=\()/gm;
+    ConfigStateService.toString()
+      .match(reg)
+      .forEach(fnName => {
+        expect(ConfigActions[fnName]).toBeTruthy();
+
+        const spy = jest.spyOn(store, 'dispatch');
+        spy.mockClear();
+
+        const params = Array.from(new Array(ConfigActions[fnName].length));
+
+        service[`dispatch${fnName}`](...params);
+        expect(spy).toHaveBeenCalledWith(new ConfigActions[fnName](...params));
       });
   });
 });

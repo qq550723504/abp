@@ -3,21 +3,21 @@ import { HttpErrorResponse } from '@angular/common/http';
 import {
   ApplicationRef,
   ComponentFactoryResolver,
+  ComponentRef,
   EmbeddedViewRef,
   Inject,
   Injectable,
   Injector,
   RendererFactory2,
-  Type,
-  ComponentRef,
 } from '@angular/core';
-import { Navigate, RouterError, RouterState, RouterDataResolved } from '@ngxs/router-plugin';
+import { Navigate, RouterDataResolved, RouterError, RouterState } from '@ngxs/router-plugin';
 import { Actions, ofActionSuccessful, Store } from '@ngxs/store';
 import { Observable, Subject } from 'rxjs';
+import { filter, map } from 'rxjs/operators';
 import snq from 'snq';
-import { ErrorComponent } from '../components/error/error.component';
-import { HttpErrorConfig, ErrorScreenErrorCodes } from '../models/common';
-import { Toaster } from '../models/toaster';
+import { HttpErrorWrapperComponent } from '../components/http-error-wrapper/http-error-wrapper.component';
+import { ErrorScreenErrorCodes, HttpErrorConfig } from '../models/common';
+import { Confirmation } from '../models/confirmation';
 import { ConfirmationService } from '../services/confirmation.service';
 
 export const DEFAULT_ERROR_MESSAGES = {
@@ -45,7 +45,7 @@ export const DEFAULT_ERROR_MESSAGES = {
 
 @Injectable({ providedIn: 'root' })
 export class ErrorHandler {
-  componentRef: ComponentRef<ErrorComponent>;
+  componentRef: ComponentRef<HttpErrorWrapperComponent>;
 
   constructor(
     private actions: Actions,
@@ -57,10 +57,38 @@ export class ErrorHandler {
     private injector: Injector,
     @Inject('HTTP_ERROR_CONFIG') private httpErrorConfig: HttpErrorConfig,
   ) {
-    this.actions.pipe(ofActionSuccessful(RestOccurError, RouterError, RouterDataResolved)).subscribe(res => {
-      if (res instanceof RestOccurError) {
-        const { payload: err = {} as HttpErrorResponse | any } = res;
-        const body = snq(() => (err as HttpErrorResponse).error.error, DEFAULT_ERROR_MESSAGES.defaultError.title);
+    this.listenToRestError();
+    this.listenToRouterError();
+    this.listenToRouterDataResolved();
+  }
+
+  private listenToRouterError() {
+    this.actions
+      .pipe(ofActionSuccessful(RouterError), filter(this.filterRouteErrors))
+      .subscribe(() => this.show404Page());
+  }
+
+  private listenToRouterDataResolved() {
+    this.actions
+      .pipe(
+        ofActionSuccessful(RouterDataResolved),
+        filter(() => !!this.componentRef),
+      )
+      .subscribe(() => {
+        this.componentRef.destroy();
+        this.componentRef = null;
+      });
+  }
+
+  private listenToRestError() {
+    this.actions
+      .pipe(
+        ofActionSuccessful(RestOccurError),
+        map(action => action.payload),
+        filter(this.filterRestErrors),
+      )
+      .subscribe(err => {
+        const body = snq(() => err.error.error, DEFAULT_ERROR_MESSAGES.defaultError.title);
 
         if (err instanceof HttpErrorResponse && err.headers.get('_AbpErrorFormat')) {
           const confirmation$ = this.showError(null, null, body);
@@ -71,7 +99,7 @@ export class ErrorHandler {
             });
           }
         } else {
-          switch ((err as HttpErrorResponse).status) {
+          switch (err.status) {
             case 401:
               this.canCreateCustomError(401)
                 ? this.show401Page()
@@ -127,27 +155,26 @@ export class ErrorHandler {
               });
               break;
             case 0:
-              if ((err as HttpErrorResponse).statusText === 'Unknown Error') {
+              if (err.statusText === 'Unknown Error') {
                 this.createErrorComponent({
                   title: {
                     key: 'AbpAccount::DefaultErrorMessage',
                     defaultValue: DEFAULT_ERROR_MESSAGES.defaultError.title,
                   },
+                  details: err.message,
+                  isHomeShow: false,
                 });
               }
               break;
             default:
-              this.showError(DEFAULT_ERROR_MESSAGES.defaultError.details, DEFAULT_ERROR_MESSAGES.defaultError.title);
+              this.showError(
+                DEFAULT_ERROR_MESSAGES.defaultError.details,
+                DEFAULT_ERROR_MESSAGES.defaultError.title,
+              );
               break;
           }
         }
-      } else if (res instanceof RouterError && snq(() => res.event.error.indexOf('Cannot match') > -1, false)) {
-        this.show404Page();
-      } else if (res instanceof RouterDataResolved && this.componentRef) {
-        this.componentRef.destroy();
-        this.componentRef = null;
-      }
-    });
+      });
   }
 
   private show401Page() {
@@ -174,11 +201,14 @@ export class ErrorHandler {
     message?: Config.LocalizationParam,
     title?: Config.LocalizationParam,
     body?: any,
-  ): Observable<Toaster.Status> {
+  ): Observable<Confirmation.Status> {
     if (body) {
       if (body.details) {
         message = body.details;
         title = body.message;
+      } else if (body.message) {
+        title = DEFAULT_ERROR_MESSAGES.defaultError.title;
+        message = body.message;
       } else {
         message = body.message || DEFAULT_ERROR_MESSAGES.defaultError.title;
       }
@@ -192,21 +222,27 @@ export class ErrorHandler {
 
   private navigateToLogin() {
     this.store.dispatch(
-      new Navigate(['/account/login'], null, { state: { redirectUrl: this.store.selectSnapshot(RouterState.url) } }),
+      new Navigate(['/account/login'], null, {
+        state: { redirectUrl: this.store.selectSnapshot(RouterState.url) },
+      }),
     );
   }
 
-  createErrorComponent(instance: Partial<ErrorComponent>) {
+  createErrorComponent(instance: Partial<HttpErrorWrapperComponent>) {
     const renderer = this.rendererFactory.createRenderer(null, null);
     const host = renderer.selectRootElement(document.body, true);
 
-    this.componentRef = this.cfRes.resolveComponentFactory(ErrorComponent).create(this.injector);
+    this.componentRef = this.cfRes
+      .resolveComponentFactory(HttpErrorWrapperComponent)
+      .create(this.injector);
 
-    for (const key in this.componentRef.instance) {
+    for (const key in instance) {
+      /* istanbul ignore else */
       if (this.componentRef.instance.hasOwnProperty(key)) {
         this.componentRef.instance[key] = instance[key];
       }
     }
+
     this.componentRef.instance.hideCloseIcon = this.httpErrorConfig.errorScreen.hideCloseIcon;
     if (this.canCreateCustomError(instance.status as ErrorScreenErrorCodes)) {
       this.componentRef.instance.cfRes = this.cfRes;
@@ -233,4 +269,17 @@ export class ErrorHandler {
         this.httpErrorConfig.errorScreen.forWhichErrors.indexOf(status) > -1,
     );
   }
+
+  private filterRestErrors = ({ status }: HttpErrorResponse): boolean => {
+    if (typeof status !== 'number') return false;
+
+    return this.httpErrorConfig.skipHandledErrorCodes.findIndex(code => code === status) < 0;
+  };
+
+  private filterRouteErrors = (instance: RouterError<any>): boolean => {
+    return (
+      snq(() => instance.event.error.indexOf('Cannot match') > -1) &&
+      this.httpErrorConfig.skipHandledErrorCodes.findIndex(code => code === 404) < 0
+    );
+  };
 }

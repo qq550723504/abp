@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using JetBrains.Annotations;
@@ -11,9 +13,25 @@ namespace Volo.Abp.Domain.Entities
     /// </summary>
     public static class EntityHelper
     {
+        private static readonly ConcurrentDictionary<string, PropertyInfo> CachedIdProperties =
+            new ConcurrentDictionary<string, PropertyInfo>();
+
         public static bool IsEntity([NotNull] Type type)
         {
             return typeof(IEntity).IsAssignableFrom(type);
+        }
+
+        public static bool IsEntityWithId([NotNull] Type type)
+        {
+            foreach (var interfaceType in type.GetInterfaces())
+            {
+                if (interfaceType.GetTypeInfo().IsGenericType && interfaceType.GetGenericTypeDefinition() == typeof(IEntity<>))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public static bool HasDefaultId<TKey>(IEntity<TKey> entity)
@@ -84,30 +102,34 @@ namespace Volo.Abp.Domain.Entities
         }
 
         public static void TrySetId<TKey>(
-            IEntity<TKey> entity, 
-            Func<TKey> idFactory, 
-            bool checkForDisableGuidGenerationAttribute = false)
+            IEntity<TKey> entity,
+            Func<TKey> idFactory,
+            bool checkForDisableIdGenerationAttribute = false)
         {
-            //TODO: Can be optimized (by caching per entity type)?
-            var entityType = entity.GetType();
-            var idProperty = entityType.GetProperty(
-                nameof(entity.Id)
-            );
-
-            if (idProperty == null)
-            {
-                return;
-            }
-
-            if (checkForDisableGuidGenerationAttribute)
-            {
-                if (idProperty.IsDefined(typeof(DisableIdGenerationAttribute), true))
+            var property = CachedIdProperties.GetOrAdd(
+                $"{entity.GetType().FullName}-{checkForDisableIdGenerationAttribute}", () =>
                 {
-                    return;
-                }
-            }
+                    var idProperty = entity
+                        .GetType()
+                        .GetProperties()
+                        .FirstOrDefault(x => x.Name == nameof(entity.Id) &&
+                                             x.GetSetMethod(true) != null);
 
-            idProperty.SetValue(entity, idFactory());
+                    if (idProperty == null)
+                    {
+                        return null;
+                    }
+
+                    if (checkForDisableIdGenerationAttribute &&
+                        idProperty.IsDefined(typeof(DisableIdGenerationAttribute), true))
+                    {
+                        return null;
+                    }
+
+                    return idProperty;
+                });
+
+            property?.SetValue(entity, idFactory());
         }
     }
 }

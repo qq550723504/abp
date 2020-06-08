@@ -35,11 +35,12 @@ namespace MyCompany.MyProject
 
 ![build-action-embedded-resource-sample](images/build-action-embedded-resource-sample.png)
 
-如果需要添加多个文件, 这样做会很乏味. 作为选择， 你可以直接编辑 **.csproj** 文件:
+如果需要添加多个文件, 这样做会很乏味. 作为选择, 你可以直接编辑 **.csproj** 文件:
 
 ````C#
 <ItemGroup>
-  <None Remove="MyResources\**\*.*" />
+  <EmbeddedResource Include="MyResources\**\*.*" />
+  <Content Remove="MyResources\**\*.*" />
 </ItemGroup>
 ````
 

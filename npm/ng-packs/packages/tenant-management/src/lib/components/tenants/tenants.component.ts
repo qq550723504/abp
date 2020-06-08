@@ -1,5 +1,5 @@
 import { ABP } from '@abp/ng.core';
-import { ConfirmationService, Toaster } from '@abp/ng.theme.shared';
+import { ConfirmationService, Confirmation, getPasswordValidators } from '@abp/ng.theme.shared';
 import { Component, OnInit, TemplateRef, ViewChild, ChangeDetectorRef } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Select, Store } from '@ngxs/store';
@@ -14,6 +14,7 @@ import {
 } from '../../actions/tenant-management.actions';
 import { TenantManagementService } from '../../services/tenant-management.service';
 import { TenantManagementState } from '../../states/tenant-management.state';
+import { eFeatureManagementComponents } from '@abp/ng.feature-management';
 
 interface SelectedModalContent {
   type: 'saveConnStr' | 'saveTenant';
@@ -50,7 +51,7 @@ export class TenantsComponent implements OnInit {
 
   _useSharedDatabase: boolean;
 
-  pageQuery: ABP.PageQueryParams = {};
+  pageQuery: ABP.PageQueryParams = { maxResultCount: 10 };
 
   loading = false;
 
@@ -59,6 +60,12 @@ export class TenantsComponent implements OnInit {
   sortOrder = '';
 
   sortKey = '';
+
+  featureManagementKey = eFeatureManagementComponents.FeatureManagement;
+
+  get hasSelectedTenant(): boolean {
+    return Boolean(this.selected.id);
+  }
 
   get useSharedDatabase(): boolean {
     return this.defaultConnectionStringForm.get('useSharedDatabase').value;
@@ -77,14 +84,26 @@ export class TenantsComponent implements OnInit {
   get isDisabledSaveButton(): boolean {
     if (!this.selectedModalContent) return false;
 
-    if (this.selectedModalContent.type === 'saveConnStr' && this.defaultConnectionStringForm.invalid) {
+    if (
+      this.selectedModalContent.type === 'saveConnStr' &&
+      this.defaultConnectionStringForm &&
+      this.defaultConnectionStringForm.invalid
+    ) {
       return true;
-    } else if (this.selectedModalContent.type === 'saveTenant' && this.tenantForm.invalid) {
+    } else if (
+      this.selectedModalContent.type === 'saveTenant' &&
+      this.tenantForm &&
+      this.tenantForm.invalid
+    ) {
       return true;
     } else {
       return false;
     }
   }
+
+  onVisibleFeaturesChange = (value: boolean) => {
+    this.visibleFeatures = value;
+  };
 
   constructor(
     private confirmationService: ConfirmationService,
@@ -97,15 +116,24 @@ export class TenantsComponent implements OnInit {
     this.get();
   }
 
-  onSearch(value) {
+  onSearch(value: string) {
     this.pageQuery.filter = value;
     this.get();
   }
 
   private createTenantForm() {
-    this.tenantForm = this.fb.group({
+    const tenantForm = this.fb.group({
       name: [this.selected.name || '', [Validators.required, Validators.maxLength(256)]],
+      adminEmailAddress: [null, [Validators.required, Validators.maxLength(256), Validators.email]],
+      adminPassword: [null, [Validators.required, ...getPasswordValidators(this.store)]],
     });
+
+    if (this.hasSelectedTenant) {
+      tenantForm.removeControl('adminEmailAddress');
+      tenantForm.removeControl('adminPassword');
+    }
+
+    this.tenantForm = tenantForm;
   }
 
   private createDefaultConnectionStringForm() {
@@ -139,7 +167,11 @@ export class TenantsComponent implements OnInit {
         this._useSharedDatabase = fetchedConnectionString ? false : true;
         this.defaultConnectionString = fetchedConnectionString ? fetchedConnectionString : '';
         this.createDefaultConnectionStringForm();
-        this.openModal('AbpTenantManagement::ConnectionStrings', this.connectionStringModalTemplate, 'saveConnStr');
+        this.openModal(
+          'AbpTenantManagement::ConnectionStrings',
+          this.connectionStringModalTemplate,
+          'saveConnStr',
+        );
       });
   }
 
@@ -183,7 +215,10 @@ export class TenantsComponent implements OnInit {
         });
     } else {
       this.tenantService
-        .updateDefaultConnectionString({ id: this.selected.id, defaultConnectionString: this.connectionString })
+        .updateDefaultConnectionString({
+          id: this.selected.id,
+          defaultConnectionString: this.connectionString,
+        })
         .pipe(
           take(1),
           finalize(() => (this.modalBusy = false)),
@@ -207,24 +242,28 @@ export class TenantsComponent implements OnInit {
       .pipe(finalize(() => (this.modalBusy = false)))
       .subscribe(() => {
         this.isModalVisible = false;
+        this.get();
       });
   }
 
   delete(id: string, name: string) {
     this.confirmationService
-      .warn('AbpTenantManagement::TenantDeletionConfirmationMessage', 'AbpTenantManagement::AreYouSure', {
-        messageLocalizationParams: [name],
-      })
-      .subscribe((status: Toaster.Status) => {
-        if (status === Toaster.Status.confirm) {
-          this.store.dispatch(new DeleteTenant(id));
+      .warn(
+        'AbpTenantManagement::TenantDeletionConfirmationMessage',
+        'AbpTenantManagement::AreYouSure',
+        {
+          messageLocalizationParams: [name],
+        },
+      )
+      .subscribe((status: Confirmation.Status) => {
+        if (status === Confirmation.Status.confirm) {
+          this.store.dispatch(new DeleteTenant(id)).subscribe(() => this.get());
         }
       });
   }
 
-  onPageChange(data) {
-    this.pageQuery.skipCount = data.first;
-    this.pageQuery.maxResultCount = data.rows;
+  onPageChange(page: number) {
+    this.pageQuery.skipCount = (page - 1) * this.pageQuery.maxResultCount;
 
     this.get();
   }
@@ -240,11 +279,20 @@ export class TenantsComponent implements OnInit {
   onSharedDatabaseChange(value: boolean) {
     if (!value) {
       setTimeout(() => {
-        const defaultConnectionString = document.getElementById('defaultConnectionString') as HTMLInputElement;
+        const defaultConnectionString = document.getElementById(
+          'defaultConnectionString',
+        ) as HTMLInputElement;
         if (defaultConnectionString) {
           defaultConnectionString.focus();
         }
       }, 0);
     }
+  }
+
+  openFeaturesModal(providerKey: string) {
+    this.providerKey = providerKey;
+    setTimeout(() => {
+      this.visibleFeatures = true;
+    }, 0);
   }
 }
