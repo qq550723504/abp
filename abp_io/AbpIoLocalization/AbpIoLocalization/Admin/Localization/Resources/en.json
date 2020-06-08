@@ -35,6 +35,7 @@
     "NameFilter": "Name",
     "CreationTime": "Creation time",
     "IsPro": "Is pro",
+    "ShowOnModuleList": "Show on module list",
     "EfCoreConfigureMethodName": "Configure method name",
     "IsProFilter": "Is pro",
     "ApplicationType": "Application type",
@@ -127,7 +128,7 @@
     "Generate": "Generate",
     "MissingQuantityField": "The quantity field is required!",
     "MissingPriceField": "The Price field is required!",
-    "CodeUsageStatus": "Code Usage Status",
+    "CodeUsageStatus": "Status",
     "Country": "Country",
     "DeveloperCount": "Developer Count",
     "RequestCode": "Request Code",
@@ -147,6 +148,12 @@
     "EmailSent": "Email Sent",
     "SuccessfullySent": "Successfully Sent",
     "SuccessfullyDeleted": "Successfully Deleted",
-    "DiscountRequestDeletionWarningMessage": "Discount request will be deleted" 
+    "DiscountRequestDeletionWarningMessage": "Discount request will be deleted",
+    "BusinessType": "Business Type",
+    "TotalQuestionCount": "Total question count",
+    "RemainingQuestionCount": "Remaining question count",
+    "TotalQuestionMustBeGreaterWarningMessage": "TotalQuestionCount must be greater than RemainingQuestionCount !",
+    "QuestionCountsMustBeGreaterThanZero": "TotalQuestionCount and RemainingQuestionCount must be zero or greater than zero !",
+    "UnlimitedQuestionCount": "Unlimited question count"
   }
 }
