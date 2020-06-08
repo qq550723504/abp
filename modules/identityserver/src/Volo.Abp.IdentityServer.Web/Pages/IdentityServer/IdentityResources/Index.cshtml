@@ -1,0 +1,56 @@
+﻿@page
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Mvc.Localization
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@using Volo.Abp.IdentityServer
+@using Volo.Abp.IdentityServer.Localization
+@using Volo.Abp.IdentityServer.Web.Navigation
+@using Volo.Abp.IdentityServer.Web.Pages.IdentityServer.IdentityResources
+@model IndexModel
+@inject IHtmlLocalizer<AbpIdentityServerResource> L
+@inject IAuthorizationService Authorization
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = L["IdentityResources"].Value;
+    PageLayout.Content.BreadCrumb.Add(L["Menu:IdentityServerManagement"].Value);
+    PageLayout.Content.MenuItemName = IdentityServerMenuNames.IdentityResources;
+}
+@section styles {
+    <abp-style-bundle name="@typeof(IndexModel).FullName">
+        <abp-style src="/Pages/AbpPermissionManagement/permission-management-modal.css" />
+    </abp-style-bundle>
+}
+@section scripts {
+    <abp-script-bundle name="@typeof(IndexModel).FullName">
+        <abp-script src="/Pages/AbpPermissionManagement/permission-management-modal.js" />
+        <abp-script src="/Pages/identityServer/IdentityResources/index.js" />
+    </abp-script-bundle>
+}
+
+<abp-card id="IdentityResourcesWrapper">
+    <abp-card-header>
+        <abp-row>
+            <abp-column size-md="_6">
+                <abp-card-title>@L["IdentityResources"]</abp-card-title>
+            </abp-column>
+            <abp-column size-md="_6" class="text-right">
+                @if (await Authorization.IsGrantedAsync(IdentityServerPermissions.IdentityResources.Create))
+                {
+                    <abp-button button-type="Primary" name="CreateIdentityResource" text="@L["NewIdentityResource"].Value" icon="plus" />
+                }
+            </abp-column>
+        </abp-row>
+    </abp-card-header>
+    <abp-card-body>
+        <abp-table striped-rows="true" class="nowrap">
+            <thead>
+                <tr>
+                    <th>@L["Actions"]</th>
+                    <th>@L["Name"]</th>
+                    <th>@L["DisplayName"]</th>
+                    <th>@L["Description"]</th>
+                </tr>
+            </thead>
+        </abp-table>
+    </abp-card-body>
+</abp-card>

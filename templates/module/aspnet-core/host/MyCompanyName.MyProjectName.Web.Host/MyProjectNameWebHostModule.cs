@@ -40,6 +40,8 @@ using Volo.Abp.UI.Navigation.Urls;
 using Volo.Abp.UI;
 using Volo.Abp.UI.Navigation;
 using Volo.Abp.VirtualFileSystem;
+using Volo.Abp.IdentityServer.Web;
+using Volo.Abp.IdentityServer;
 
 namespace MyCompanyName.MyProjectName
 {
@@ -53,6 +55,8 @@ namespace MyCompanyName.MyProjectName
         typeof(AbpHttpClientIdentityModelWebModule),
         typeof(AbpIdentityWebModule),
         typeof(AbpIdentityHttpApiClientModule),
+        typeof(AbpIdentityServerWebModule),
+        typeof(AbpIdentityServerHttpApiClientModule),
         typeof(AbpTenantManagementWebModule),
         typeof(AbpTenantManagementHttpApiClientModule),
         typeof(AbpFeatureManagementHttpApiClientModule),
@@ -87,7 +91,7 @@ namespace MyCompanyName.MyProjectName
             ConfigureVirtualFileSystem(hostingEnvironment);
             ConfigureSwaggerServices(context.Services);
             ConfigureMultiTenancy();
-            ConfigureRedis(context, configuration, hostingEnvironment);
+            //ConfigureRedis(context, configuration, hostingEnvironment);
         }
 
         private void ConfigureMenu(IConfiguration configuration)

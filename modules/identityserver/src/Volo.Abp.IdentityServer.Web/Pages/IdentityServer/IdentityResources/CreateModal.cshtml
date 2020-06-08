@@ -1,0 +1,29 @@
+﻿@page
+@using Microsoft.AspNetCore.Mvc.Localization
+@using Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Modal
+@using Volo.Abp.IdentityServer.Localization
+@model Volo.Abp.IdentityServer.Web.Pages.IdentityServer.IdentityResources.CreateModalModel
+@inject IHtmlLocalizer<AbpIdentityServerResource> L
+@{
+    Layout = null;
+}
+<form method="post" asp-page="/IdentityServer/IdentityResources/CreateModal">
+    <abp-modal>
+        <abp-modal-header title="@L["NewIdentityResource"].Value"></abp-modal-header>
+        <abp-modal-body>
+            <abp-tabs name="create-IdentityResource-modal-tabs">
+                <abp-tab title="@L["IdentityResourceInformations"].Value">
+                    @* TODO: Can we use dynamic form? *@
+                    <abp-input asp-for="IdentityResource.Name" />
+                    <abp-input asp-for="IdentityResource.DisplayName" />
+                    <abp-input asp-for="IdentityResource.Description" />
+                    <abp-input asp-for="IdentityResource.Required" />
+                    <abp-input asp-for="IdentityResource.Emphasize" />
+                    <abp-input asp-for="IdentityResource.ShowInDiscoveryDocument" />
+                    <abp-input asp-for="IdentityResource.Enabled" />
+                </abp-tab>
+            </abp-tabs>
+        </abp-modal-body>
+        <abp-modal-footer buttons="@(AbpModalButtons.Cancel|AbpModalButtons.Save)"></abp-modal-footer>
+    </abp-modal>
+</form>
