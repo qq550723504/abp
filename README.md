@@ -5,30 +5,24 @@
 [![MyGet (with prereleases)](https://img.shields.io/myget/abp-nightly/vpre/Volo.Abp.svg?style=flat-square)](https://docs.abp.io/en/abp/latest/Nightly-Builds)
 [![NuGet Download](https://img.shields.io/nuget/dt/Volo.Abp.Core.svg?style=flat-square)](https://www.nuget.org/packages/Volo.Abp.Core)
 
-This project is the next generation of the [ASP.NET Boilerplate](https://aspnetboilerplate.com/) web application framework. See [the announcement](https://blog.abp.io/abp/Abp-vNext-Announcement).
+## abp模块自定义
 
-See the official [web site (abp.io)](https://abp.io/) for more information.
+了解官方信息 [web site (abp.io)](https://abp.io/).
 
-### Documentation
+### 文档
 
-See the <a href="https://docs.abp.io/" target="_blank">documentation</a>.
+查看官方文档 <a href="https://docs.abp.io/" target="_blank"></a>.
 
-### Development
-
-#### Pre Requirements
+### 开发环境
 
 - Visual Studio 2019 16.4.0+
 
-#### Framework
+#### 框架
 
-Framework solution is located under the `framework` folder. It has no external dependency.
+不会更改Abp基础框架代码
 
-#### Modules/Templates
+#### 模块/模板
 
-[Modules](modules/) and [Templates](templates/) have their own solutions and have **local references** to the framework and each other.
+[Modules](模块/) and [Templates](模板/) 有自己的解决方案，并且有**本地引用**到框架和彼此。
 
-Visual Studio can not work properly with the local references out of the solution folder. When you open a module/sample solution in the Visual Studio, you may get some errors related to the dependencies. In this case, run the `dotnet restore` on the command prompt for the related solution's folder. You need to run it after you first open the solution or change a dependency.
-
-### Contribution
-
-ABP is an open source platform. Check [the contribution guide](docs/en/Contribution/Index.md) if you want to contribute to the project.
+从解决方案文件夹中取出本地引用时，Visual Studio无法正常工作。当您在Visual Studio中打开一个模块/示例解决方案时，您可能会得到一些与依赖关系相关的错误。在这种情况下，在命令提示符上运行相关解决方案文件夹的“dotnet restore”。您需要在第一次打开解决方案或更改依赖项后运行它。
